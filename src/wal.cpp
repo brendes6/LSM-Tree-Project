@@ -148,3 +148,8 @@ void Wal::replay(const std::function<void(Op, const std::string&,
         pos += 4;
     }
 }
+
+
+void Wal::clear(){
+    ftruncate(fd_, 0);
+}

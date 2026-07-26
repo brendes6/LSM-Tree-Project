@@ -1,8 +1,12 @@
 #pragma once
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
+
+#include "wal.h"
+#include "sstable.h"
 
 namespace lsm {
 
@@ -15,7 +19,7 @@ struct Options {
 
 class DB {
   public:
-    // Opens (or creates) a db in Options::dir, replaying WAL to 
+    // opens (or creates) a db in Options::dir, replaying WAL to 
     // rebuild memtable in case of crash
     static DB open(const Options& opts);
 
@@ -23,11 +27,19 @@ class DB {
     std::optional<std::string> get(const std::string& key);
     void erase(const std::string& key);   // tombstone
 
-    // Ordered range scan over [start, end). Returns key/value pairs.
+    // ordered range scan over [start, end). Returns key/value pairs.
     std::vector<std::pair<std::string, std::string>>
     scan(const std::string& start, const std::string& end);
 
     void close();                          // flush + fsync + shut down
+  
+  private:
+    void flush();
+    Options                                 opts_;
+    std::unique_ptr<Wal>                    wal_;       // owns the log fd
+    Memtable                                memtable_;  // active, in-RAM
+    std::vector<std::unique_ptr<SSTableReader>> sstables_;  // creation order
+    std::uint64_t                           next_sst_id_ = 0;  // for filenames
 };
 
 } // namespace lsm

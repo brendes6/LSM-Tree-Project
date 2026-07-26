@@ -32,6 +32,9 @@ class Wal {
         const std::function<void(Op op,
                                  const std::string& key,
                                  const std::string& value)>& apply);
+    
+
+    void clear();
 
   private:
     int  fd_;

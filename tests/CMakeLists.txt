@@ -26,3 +26,8 @@ add_executable(sstable_test sstable_test.cpp)
 target_link_libraries(sstable_test PRIVATE lsm GTest::gtest_main)
 target_include_directories(sstable_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 gtest_discover_tests(sstable_test)
+
+add_executable(db_test db_test.cpp)
+target_link_libraries(db_test PRIVATE lsm GTest::gtest_main)
+target_include_directories(db_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+gtest_discover_tests(db_test)

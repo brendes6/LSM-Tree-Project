@@ -1,2 +1,3 @@
 # LSM-Tree-Project
-A C++ based implementation of a LSM tree storage engine,
+
+This project is a C++ based implementation of a LSM Tree storage engine.

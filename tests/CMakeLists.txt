@@ -36,3 +36,8 @@ add_executable(bloom_test bloom_test.cpp)
 target_link_libraries(bloom_test PRIVATE lsm GTest::gtest_main)
 target_include_directories(bloom_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 gtest_discover_tests(bloom_test)
+
+add_executable(compaction_test compaction_test.cpp)
+target_link_libraries(compaction_test PRIVATE lsm GTest::gtest_main)
+target_include_directories(compaction_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+gtest_discover_tests(compaction_test)

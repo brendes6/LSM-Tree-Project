@@ -41,3 +41,8 @@ add_executable(compaction_test compaction_test.cpp)
 target_link_libraries(compaction_test PRIVATE lsm GTest::gtest_main)
 target_include_directories(compaction_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 gtest_discover_tests(compaction_test)
+
+add_executable(scan_test scan_test.cpp)
+target_link_libraries(scan_test PRIVATE lsm GTest::gtest_main)
+target_include_directories(scan_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+gtest_discover_tests(scan_test)

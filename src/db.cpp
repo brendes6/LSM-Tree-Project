@@ -113,11 +113,49 @@ void DB::erase(const std::string& key) {
 
 std::vector<std::pair<std::string, std::string>>
 DB::scan(const std::string& start, const std::string& end) {
-    // TODO : ordered merge over memtable + sstables in [start, end)
-    (void)start;
-    (void)end;
 
-    return {};
+    // populate map of most recent entries
+    std::map<std::string, Entry> ret_map;
+    
+    // search sstables oldest to newest for val
+    for (const auto& table : sstables_){
+
+        auto it = table->iterator();
+
+        // iterate to valid keys
+        while (it.valid() && it.key() < start){
+            it.next();
+        }
+        // while keys less than end, add to map
+        while (it.valid() && it.key() < end){
+            ret_map[it.key()] = it.entry();
+            it.next();
+        }
+    }
+
+    // iterate memtable, adding keys in range to new map
+    for (const auto& [key, entry] : memtable_.entries()){
+        if (key < start){
+            continue;
+        }
+        else if (key >= end){
+            break;
+        }
+
+        ret_map[key] = entry;
+    }
+
+    // return vector storing key, value pairs in order
+    std::vector<std::pair<std::string, std::string>> ret_vec;
+
+    // add only Put operations
+    for (const auto& [k, ent] : ret_map){
+        if (ent.op == Op::Put){
+            ret_vec.push_back({k, ent.value});
+        }
+    }
+
+    return ret_vec;
 }
 
 void DB::close() {

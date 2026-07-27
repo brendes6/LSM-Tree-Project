@@ -77,9 +77,18 @@ void SSTableWriter::write(const std::string& path, const std::map<std::string, E
 
 }
 
+
+// overload for a write function that takes in a sequence of entries rather than
+// a map, suited for the output of a compaction run
+void SSTableWriter::write(const std::string& path,
+                          const std::vector<std::pair<std::string, Entry>>& entries) {
+    std::map<std::string, Entry> m(entries.begin(), entries.end());
+    write(path, m);
+}
+
 // reader constructor: create file descriptor and populate index vector
 SSTableReader::SSTableReader(const std::string& path)
-    : fd_(-1), data_end_(0) {
+    : fd_(-1), data_end_(0), path_(path){
 
     fd_ = ::open(path.c_str(), O_RDONLY);
     
@@ -216,4 +225,57 @@ std::optional<Entry> SSTableReader::get(const std::string& key) {
 
 
     return std::nullopt;
+}
+
+// SSTableReader::Iterator
+// loads the whole data block once, then walks it entry by entry. parse_current
+// reads the entry at pos_ AND advances pos_, so next() is just a re-parse.
+SSTableReader::Iterator::Iterator(const SSTableReader& reader) {
+    data_.assign(reader.data_end_, '\0');
+    ::pread(reader.fd_, data_.data(), data_.size(), 0);
+    parse_current();
+}
+
+void SSTableReader::Iterator::next() {
+    parse_current();
+}
+
+// parse the sstable file, exxtracting key, val, op from
+// the file descriptor
+void SSTableReader::Iterator::parse_current() {
+    if (pos_ >= data_.size()) { valid_ = false; return; }
+
+    // extract key length
+    uint32_t key_len = read_u32(reinterpret_cast<const unsigned char*>(data_.data() + pos_));
+    pos_ += 4;
+
+    if ((pos_ + key_len + 4) > data_.size()){
+        throw std::runtime_error("error");
+    }
+
+    // extract key, val length
+    key_ = data_.substr(pos_, key_len);
+    pos_ += key_len;
+    std::uint32_t val_len =
+        read_u32(reinterpret_cast<const unsigned char*>(data_.data() + pos_));
+    pos_ += 4;
+
+    if ((pos_ + val_len + 1) > data_.size()){
+        throw std::runtime_error("error");
+    }
+
+    // extract val length, operator
+    std::string parsed_val = data_.substr(pos_, val_len);
+    pos_ += val_len;
+    Op op = static_cast<Op>(static_cast<unsigned char>(data_[pos_]));
+
+    entry_ = {op, parsed_val};
+
+    pos_ += 1;
+    valid_ = true;
+
+}
+
+const std::string& SSTableReader::path() const{
+    return path_;
 }

@@ -7,6 +7,7 @@
 
 #include "wal.h"
 #include "sstable.h"
+#include "compaction.h"
 
 namespace lsm {
 

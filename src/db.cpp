@@ -151,6 +151,34 @@ void DB::flush(){
     wal_->clear();
 
     next_sst_id_++;
+
+    // start sstable compaction if needed
+    if (sstables_.size() >= opts_.sstable_trigger) {
+
+        // store all sstables and paths
+        std::vector<SSTableReader*> inputs;
+        std::vector<std::string>    old_paths;
+        for (auto& r : sstables_) { inputs.push_back(r.get()); old_paths.push_back(r->path()); }
+
+        // get new sstable filename
+        std::string new_sst_str = std::to_string(next_sst_id_);
+        if (new_sst_str.length() < total_width) {
+            new_sst_str.insert(0, total_width - new_sst_str.length(), '0');
+        }
+        std::string out = opts_.dir + "/" + new_sst_str + ".sst";
+
+        // compact to new file, write+fsync new file
+        Compaction::compact(inputs, out);
+        next_sst_id_++;
+
+        // drop old sstable readers, add new one
+        sstables_.clear();
+        sstables_.push_back(std::make_unique<SSTableReader>(out));
+
+        // remove old sstable files
+        for (auto& p : old_paths) std::filesystem::remove(p);
+    }
 }
+
 
 }  // namespace lsm

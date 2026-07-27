@@ -31,3 +31,8 @@ add_executable(db_test db_test.cpp)
 target_link_libraries(db_test PRIVATE lsm GTest::gtest_main)
 target_include_directories(db_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 gtest_discover_tests(db_test)
+
+add_executable(bloom_test bloom_test.cpp)
+target_link_libraries(bloom_test PRIVATE lsm GTest::gtest_main)
+target_include_directories(bloom_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+gtest_discover_tests(bloom_test)

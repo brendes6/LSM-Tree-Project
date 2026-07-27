@@ -21,10 +21,16 @@ void SSTableWriter::write(const std::string& path, const std::map<std::string, E
     // footer: stores index offset into sstable, num entries and magic num
     std::string footer;
 
+    // initialize bloom filter w tunable fp rate
+    Bloom bloom(entries.size(), 0.01);
+
     std::size_t num_entries = 0;
     std::size_t offset = 0;
 
     for (const auto& [key, entry] : entries){
+
+        // add key to bloom filter
+        bloom.insert(key);
 
         // place key/val sizes+data on data
         put_u32(data, key.size());
@@ -49,6 +55,8 @@ void SSTableWriter::write(const std::string& path, const std::map<std::string, E
     put_u64(footer, data.size());
     // num entries
     put_u64(footer, entries.size());
+    // bloom offset
+    put_u64(footer, data.size() + idx.size());
     // magic num
     put_u32(footer, sstable::kMagic);
 
@@ -58,8 +66,11 @@ void SSTableWriter::write(const std::string& path, const std::map<std::string, E
         throw std::runtime_error("SSTable: failed to open file");
     }
 
+    // get string from bloom filter
+    std::string bloom_block = bloom.serialize();
+
     // write all combined data, fsync and close
-    std::string all_combined = data + idx + footer;
+    std::string all_combined = data + idx + bloom_block + footer;
     ::write(fd_, all_combined.data(), all_combined.size());
     ::fsync(fd_);
     ::close(fd_);
@@ -86,7 +97,8 @@ SSTableReader::SSTableReader(const std::string& path)
 
     uint64_t index_offset = read_u64(reinterpret_cast<const unsigned char*>(buf.data() + 0));
     uint64_t _ = read_u64(reinterpret_cast<const unsigned char*>(buf.data() + 8));
-    uint32_t magic = read_u32(reinterpret_cast<const unsigned char*>(buf.data() + 16));
+    uint64_t bloom_offset = read_u64(reinterpret_cast<const unsigned char*>(buf.data() + 16));
+    uint32_t magic = read_u32(reinterpret_cast<const unsigned char*>(buf.data() + 24));
 
     //verify magic num
     if (magic != sstable::kMagic){
@@ -96,8 +108,16 @@ SSTableReader::SSTableReader(const std::string& path)
     data_end_ = index_offset;
 
     // read in index table
-    std::string idx_buf(file_size - index_offset - sstable::kFooterSize, '\0');
+    std::string idx_buf(bloom_offset - index_offset, '\0');
     ::pread(fd_, idx_buf.data(), idx_buf.size(), index_offset);
+
+    // read in bloom table
+    std::string bloom_buf(file_size - bloom_offset - sstable::kFooterSize, '\0');
+    ::pread(fd_, bloom_buf.data(), bloom_buf.size(), bloom_offset);
+
+    bloom_ = std::make_unique<Bloom>(
+        Bloom::deserialize(reinterpret_cast<const unsigned char*>(bloom_buf.data()), bloom_buf.size())
+    );
 
     //parse string into (key, index) pairs and add to vector
     std::size_t i = 0;
@@ -128,6 +148,8 @@ SSTableReader::~SSTableReader() {
 // to determine where to start search in data. Iterate data, checking keys until
 // we find it or reach a key with val > our search, if so return nullopt
 std::optional<Entry> SSTableReader::get(const std::string& key) {
+    // first check bloom filter - if bloom filter says no, return nullopt
+    if (bloom_ && !bloom_->might_contain(key)) return std::nullopt;
 
     // binary search to find greatest index with key <= ours
     int block = -1, l = 0, r = (int)index_.size() - 1;

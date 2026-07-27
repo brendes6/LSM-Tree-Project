@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "memtable.h"
+#include "bloom.h"
 
 // SSTable: Immutable, sorted on-disk table with layout:
 
@@ -18,7 +19,7 @@
 
 namespace sstable {
 constexpr std::uint32_t kMagic      = 0x4C534D31;  // magic number - encoded 'LSM1'
-constexpr std::size_t   kFooterSize = 20;
+constexpr std::size_t   kFooterSize = 28;
 constexpr std::size_t   kIndexEvery = 16;
 }  // namespace sstable
 
@@ -46,6 +47,7 @@ class SSTableReader {
     int fd_;
     // Sparse index loaded into memory: sorted (key, offset-into-data-block)
     std::vector<std::pair<std::string, std::uint64_t>> index_;
+    std::unique_ptr<Bloom> bloom_;
     std::uint64_t data_end_;  // byte offset where data block ends
 };
 

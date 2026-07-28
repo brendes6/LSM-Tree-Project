@@ -23,3 +23,4 @@ target_include_directories(lsm PUBLIC include PRIVATE src)
 
 enable_testing()
 add_subdirectory(tests)
+add_subdirectory(bench)

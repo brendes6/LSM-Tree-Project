@@ -8,6 +8,7 @@
 #include <stdexcept>
 
 #include "encoding.h"
+#include "metrics.h"
 
 
 // write(): given the file path and memtable, write all entries in specific 
@@ -72,6 +73,7 @@ void SSTableWriter::write(const std::string& path, const std::map<std::string, E
     // write all combined data, fsync and close
     std::string all_combined = data + idx + bloom_block + footer;
     ::write(fd_, all_combined.data(), all_combined.size());
+    metrics::add_bytes_written(all_combined.size());
     ::fsync(fd_);
     ::close(fd_);
 
@@ -179,7 +181,10 @@ std::optional<Entry> SSTableReader::get(const std::string& key) {
 
     // create data string storing data from start index to end of sstable entries
     uint64_t start = index_[block].second;
-    std::string data(data_end_ - start, '\0');
+    uint64_t stop  = (block + 1 < (int)index_.size())
+                     ? index_[block + 1].second
+                     : data_end_;
+    std::string data(stop - start, '\0');
     ::pread(fd_, data.data(), data.size(), start);
 
     // search this data string

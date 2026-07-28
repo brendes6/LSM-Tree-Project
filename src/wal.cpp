@@ -8,6 +8,7 @@
 #include <stdexcept>
 
 #include "encoding.h"
+#include "metrics.h"
 
 namespace {
 
@@ -72,6 +73,7 @@ void Wal::append(Op op, const std::string& key, const std::string& value) {
 
     // write and fsync if toggled
     ::write(fd_, rec.data(), rec.size());
+    metrics::add_bytes_written(rec.size());
     if (sync_on_write_){
         ::fsync(fd_);
     }
